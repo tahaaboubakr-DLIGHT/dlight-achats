@@ -58,19 +58,41 @@ export default function Home() {
   async function addPurchase(fd) {
     const sb = getSupabase();
     if (!sb) return;
-    const row = { product_name: fd.product, category: fd.category, quantity: fd.qty, unit: fd.unit,
-      unit_price: fd.priceUnit, total: fd.total, note: fd.note, buyer_name: currentUser.name, buyer_email: currentUser.email };
+    const row = {
+      product_name: fd.product, category: fd.category, quantity: fd.qty, unit: fd.unit,
+      unit_price: fd.priceUnit, total: fd.total, note: fd.note,
+      buyer_name: currentUser.name, buyer_email: currentUser.email,
+      purchase_date: fd.purchaseDate,
+    };
     const { data, error } = await sb.from("purchases").insert([row]).select().single();
     if (error) { flash(false); return; }
     setPurchases(prev => [data, ...prev]); flash(true); startUndo(data);
   }
-  async function deletePurchase(id) {
+
+  async function deletePurchase(id, reason, purchase) {
     const sb = getSupabase();
     if (!sb) return;
+    const logEntry = {
+      purchase_id: id,
+      product_name: purchase.product_name,
+      category: purchase.category,
+      quantity: purchase.quantity,
+      unit: purchase.unit,
+      unit_price: purchase.unit_price,
+      total: purchase.total,
+      purchase_date: purchase.purchase_date,
+      buyer_name: purchase.buyer_name,
+      buyer_email: purchase.buyer_email,
+      deleted_by_name: currentUser.name,
+      deleted_by_email: currentUser.email,
+      reason: reason,
+    };
+    await sb.from("deletion_logs").insert([logEntry]);
     const { error } = await sb.from("purchases").delete().eq("id", id);
     if (error) { flash(false); return; }
     setPurchases(prev => prev.filter(p => p.id !== id)); flash(true);
   }
+
   function startUndo(p) {
     setLastPurchase(p); setUndoTimer(10);
     if (undoRef.current) clearInterval(undoRef.current);
@@ -78,11 +100,14 @@ export default function Home() {
       setUndoTimer(t => { if (t <= 1) { clearInterval(undoRef.current); setLastPurchase(null); return 0; } return t - 1; });
     }, 1000);
   }
+
   async function handleUndo() {
     if (!lastPurchase) return;
     if (undoRef.current) clearInterval(undoRef.current);
-    await deletePurchase(lastPurchase.id); setLastPurchase(null); setUndoTimer(0);
+    await deletePurchase(lastPurchase.id, "erreur", lastPurchase);
+    setLastPurchase(null); setUndoTimer(0);
   }
+
   async function addProduct(prod) {
     const sb = getSupabase();
     if (!sb) return;
@@ -124,7 +149,10 @@ export default function Home() {
   if (!currentUser) return <LoginScreen users={users} onLogin={handleLogin} />;
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todayP = purchases.filter(p => p.created_at && p.created_at.startsWith(todayStr));
+  const todayP = purchases.filter(p => {
+    const pDate = p.purchase_date || (p.created_at ? p.created_at.slice(0, 10) : "");
+    return pDate === todayStr;
+  });
   const todayTotal = todayP.reduce((s, p) => s + Number(p.total), 0);
   const allTotal = purchases.reduce((s, p) => s + Number(p.total), 0);
 
