@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import LoginScreen from "@/components/LoginScreen";
 import Header from "@/components/Header";
 import Stats from "@/components/Stats";
@@ -32,11 +32,13 @@ export default function Home() {
   }, []);
 
   async function loadData() {
+    const sb = getSupabase();
+    if (!sb) { setLoading(false); return; }
     try {
       const [{ data: u }, { data: p }, { data: pu }] = await Promise.all([
-        supabase.from("users").select("*").order("name"),
-        supabase.from("products").select("*").order("name"),
-        supabase.from("purchases").select("*").order("created_at", { ascending: false }).limit(200),
+        sb.from("users").select("*").order("name"),
+        sb.from("products").select("*").order("name"),
+        sb.from("purchases").select("*").order("created_at", { ascending: false }).limit(200),
       ]);
       if (u) setUsers(u);
       if (p) setProducts(p);
@@ -54,14 +56,18 @@ export default function Home() {
   function handleLogout() { setCurrentUser(null); localStorage.removeItem("dlight-user"); }
 
   async function addPurchase(fd) {
+    const sb = getSupabase();
+    if (!sb) return;
     const row = { product_name: fd.product, category: fd.category, quantity: fd.qty, unit: fd.unit,
       unit_price: fd.priceUnit, total: fd.total, note: fd.note, buyer_name: currentUser.name, buyer_email: currentUser.email };
-    const { data, error } = await supabase.from("purchases").insert([row]).select().single();
+    const { data, error } = await sb.from("purchases").insert([row]).select().single();
     if (error) { flash(false); return; }
     setPurchases(prev => [data, ...prev]); flash(true); startUndo(data);
   }
   async function deletePurchase(id) {
-    const { error } = await supabase.from("purchases").delete().eq("id", id);
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb.from("purchases").delete().eq("id", id);
     if (error) { flash(false); return; }
     setPurchases(prev => prev.filter(p => p.id !== id)); flash(true);
   }
@@ -78,23 +84,31 @@ export default function Home() {
     await deletePurchase(lastPurchase.id); setLastPurchase(null); setUndoTimer(0);
   }
   async function addProduct(prod) {
+    const sb = getSupabase();
+    if (!sb) return;
     if (products.find(p => p.name.toLowerCase() === prod.name.toLowerCase())) return;
-    const { data, error } = await supabase.from("products").insert([prod]).select().single();
+    const { data, error } = await sb.from("products").insert([prod]).select().single();
     if (error) return;
     setProducts(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name, "fr")));
   }
   async function removeProduct(id) {
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb.from("products").delete().eq("id", id);
     if (error) { flash(false); return; }
     setProducts(prev => prev.filter(p => p.id !== id)); flash(true);
   }
   async function addUser(user) {
-    const { data, error } = await supabase.from("users").insert([user]).select().single();
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data, error } = await sb.from("users").insert([user]).select().single();
     if (error) { flash(false); return; }
     setUsers(prev => [...prev, data]); flash(true);
   }
   async function removeUser(id) {
-    const { error } = await supabase.from("users").delete().eq("id", id);
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb.from("users").delete().eq("id", id);
     if (error) { flash(false); return; }
     setUsers(prev => prev.filter(u => u.id !== id)); flash(true);
   }
