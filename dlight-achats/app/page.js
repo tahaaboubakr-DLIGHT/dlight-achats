@@ -8,6 +8,7 @@ import NavTabs from "@/components/NavTabs";
 import PurchaseForm from "@/components/PurchaseForm";
 import PurchaseHistory from "@/components/PurchaseHistory";
 import AdminPanel from "@/components/AdminPanel";
+import DeletionLogs from "@/components/DeletionLogs";
 import SaveIndicator from "@/components/SaveIndicator";
 import { exportCSV } from "@/lib/utils";
 
@@ -170,6 +171,7 @@ export default function Home() {
         {view === "form" && <PurchaseForm products={products} onAdd={addPurchase} onNewProduct={addProduct} lastPurchase={lastPurchase} undoTimer={undoTimer} onUndo={handleUndo} />}
         {view === "history" && <PurchaseHistory purchases={purchases} currentUser={currentUser} onDelete={deletePurchase} />}
         {view === "admin" && currentUser.role === "admin" && <AdminPanel users={users} onAddUser={addUser} onRemoveUser={removeUser} products={products} onAddProduct={addProduct} onRemoveProduct={removeProduct} />}
+        {view === "deletions" && currentUser.role === "admin" && <DeletionLogs />}
       </div>
       <SaveIndicator status={saveStatus} />
     </div>
