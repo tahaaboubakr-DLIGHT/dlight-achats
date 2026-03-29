@@ -1,6 +1,13 @@
 "use client";
 export default function NavTabs({ view, setView, isAdmin }) {
-  const tabs = [{ id: "form", label: "Saisir" }, { id: "history", label: "Historique" }, ...(isAdmin ? [{ id: "admin", label: "Admin" }] : [])];
+  const tabs = [
+    { id: "form", label: "Saisir" },
+    { id: "history", label: "Historique" },
+    ...(isAdmin ? [
+      { id: "deletions", label: "Supprimés" },
+      { id: "admin", label: "Admin" },
+    ] : []),
+  ];
   return (
     <div className="flex bg-gray-100 rounded-xl p-1 mb-3">
       {tabs.map(t => (
