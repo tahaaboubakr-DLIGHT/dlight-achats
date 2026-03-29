@@ -11,6 +11,7 @@ export default function PurchaseForm({ products, onAdd, onNewProduct, lastPurcha
   const [unit, setUnit] = useState("kg");
   const [price, setPrice] = useState("");
   const [note, setNote] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const prodRef = useRef(null);
   const total = (parseFloat(qty) || 0) * (parseFloat(price) || 0);
@@ -22,11 +23,18 @@ export default function PurchaseForm({ products, onAdd, onNewProduct, lastPurcha
     if (!ok || submitting) return;
     setSubmitting(true);
     const c = cat || "Non classé";
-    await onAdd({ product: pn.trim(), category: c, qty: parseFloat(qty), unit, priceUnit: parseFloat(price), total: Math.round(total * 100) / 100, note: note.trim() });
+    const dateToUse = purchaseDate || new Date().toISOString().slice(0, 10);
+    await onAdd({
+      product: pn.trim(), category: c, qty: parseFloat(qty),
+      unit, priceUnit: parseFloat(price),
+      total: Math.round(total * 100) / 100, note: note.trim(),
+      purchaseDate: dateToUse,
+    });
     if (!products.find(p => p.name.toLowerCase() === pn.trim().toLowerCase())) await onNewProduct({ name: pn.trim(), category: c });
-    setPn(""); setCat(""); setQty(""); setPrice(""); setNote(""); setSubmitting(false);
+    setPn(""); setCat(""); setQty(""); setPrice(""); setNote(""); setPurchaseDate(""); setSubmitting(false);
     setTimeout(() => { if (prodRef.current) prodRef.current.focus(); }, 100);
   }
+  const today = new Date().toISOString().slice(0, 10);
   return (
     <div className="flex flex-col gap-3">
       {lastPurchase && undoTimer > 0 && (
@@ -61,6 +69,13 @@ export default function PurchaseForm({ products, onAdd, onNewProduct, lastPurcha
               </select>
             </div>
           )}
+        </div>
+        <div className="mb-3.5">
+          <label className="text-sm text-gray-500 block mb-1.5">
+            Date d&apos;achat <span className="text-gray-400">(aujourd&apos;hui par défaut)</span>
+          </label>
+          <input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} max={today}
+            className="w-full h-11 px-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-dlight/30" />
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-2.5 mb-3.5">
           <div>
