@@ -1,111 +1,144 @@
 "use client";
-import { useState, useRef } from "react";
-import ProductAutocomplete from "./ProductAutocomplete";
+import { useState } from "react";
 import CatBadge from "./CatBadge";
-import { formatDH } from "@/lib/utils";
-import { UNITS } from "@/lib/constants";
-export default function PurchaseForm({ products, onAdd, onNewProduct, lastPurchase, undoTimer, onUndo }) {
-  const [pn, setPn] = useState("");
-  const [cat, setCat] = useState("");
-  const [qty, setQty] = useState("");
-  const [unit, setUnit] = useState("kg");
-  const [price, setPrice] = useState("");
-  const [note, setNote] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const prodRef = useRef(null);
-  const total = (parseFloat(qty) || 0) * (parseFloat(price) || 0);
-  const allCats = [...new Set(products.map(p => p.category))].sort((a, b) => a.localeCompare(b, "fr"));
-  const ok = pn.trim() && qty && parseFloat(qty) > 0 && price && parseFloat(price) > 0;
-  function handleSelect(p) { setPn(p.name); setCat(p.category); }
-  function handleChange(val) { setPn(val); const m = products.find(p => p.name.toLowerCase() === val.trim().toLowerCase()); setCat(m ? m.category : ""); }
-  async function handleSubmit() {
-    if (!ok || submitting) return;
-    setSubmitting(true);
-    const c = cat || "Non classé";
-    const dateToUse = purchaseDate || new Date().toISOString().slice(0, 10);
-    await onAdd({
-      product: pn.trim(), category: c, qty: parseFloat(qty),
-      unit, priceUnit: parseFloat(price),
-      total: Math.round(total * 100) / 100, note: note.trim(),
-      purchaseDate: dateToUse,
-    });
-    if (!products.find(p => p.name.toLowerCase() === pn.trim().toLowerCase())) await onNewProduct({ name: pn.trim(), category: c });
-    setPn(""); setCat(""); setQty(""); setPrice(""); setNote(""); setPurchaseDate(""); setSubmitting(false);
-    setTimeout(() => { if (prodRef.current) prodRef.current.focus(); }, 100);
-  }
-  const today = new Date().toISOString().slice(0, 10);
+import { formatDate, formatDH } from "@/lib/utils";
+
+function DeleteModal({ purchase, onConfirm, onCancel }) {
+  const [reason, setReason] = useState("");
   return (
-    <div className="flex flex-col gap-3">
-      {lastPurchase && undoTimer > 0 && (
-        <div className="bg-green-50 border border-green-300 rounded-xl px-3 py-2.5 flex justify-between items-center gap-2 animate-fade-in">
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium text-green-800">Dernier achat enregistré</div>
-            <div className="text-[13px] text-green-700 mt-0.5">{lastPurchase.product_name} — {lastPurchase.quantity} {lastPurchase.unit} × {formatDH(lastPurchase.unit_price)} = {formatDH(lastPurchase.total)}</div>
-          </div>
-          <button onClick={onUndo} className="bg-red-700 text-white rounded-lg px-3 py-2 text-[13px] font-medium whitespace-nowrap active:scale-95 transition">Annuler ({undoTimer}s)</button>
+    <div className="fixed inset-0 z-[300] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+      <div className="bg-white rounded-2xl p-5 max-w-[360px] w-full shadow-xl">
+        <h3 className="text-[16px] font-medium mb-1">Supprimer cet achat ?</h3>
+        <div className="text-sm text-gray-500 mb-4">
+          {purchase.product_name} — {formatDH(purchase.total)}
+        </div>
+        <label className="text-sm text-gray-500 block mb-2">Motif de suppression (obligatoire)</label>
+        <div className="flex flex-col gap-2 mb-4">
+          <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${reason === "doublon" ? "border-dlight bg-green-50" : "border-gray-200"}`}>
+            <input type="radio" name="reason" value="doublon" checked={reason === "doublon"} onChange={() => setReason("doublon")}
+              className="w-4 h-4 accent-dlight" style={{ accentColor: "#0F6E56" }} />
+            <div>
+              <div className="text-sm font-medium text-gray-900">Doublon</div>
+              <div className="text-xs text-gray-500">Cet achat a été saisi deux fois</div>
+            </div>
+          </label>
+          <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${reason === "erreur" ? "border-dlight bg-green-50" : "border-gray-200"}`}>
+            <input type="radio" name="reason" value="erreur" checked={reason === "erreur"} onChange={() => setReason("erreur")}
+              className="w-4 h-4" style={{ accentColor: "#0F6E56" }} />
+            <div>
+              <div className="text-sm font-medium text-gray-900">Erreur de saisie</div>
+              <div className="text-xs text-gray-500">Mauvais produit, quantité ou prix</div>
+            </div>
+          </label>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 active:scale-95 transition">Annuler</button>
+          <button onClick={() => reason && onConfirm(reason)} disabled={!reason}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-medium text-white active:scale-95 transition ${reason ? "bg-red-600" : "bg-gray-300 cursor-default"}`}>
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PurchaseHistory({ purchases, currentUser, onDelete }) {
+  const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [buyerFilter, setBuyerFilter] = useState("");
+  const [catFilter, setCatFilter] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const buyers = [...new Set(purchases.map(p => p.buyer_name))].sort();
+  const cats = [...new Set(purchases.map(p => p.category))].sort((a, b) => a.localeCompare(b, "fr"));
+
+  const filtered = purchases.filter(p => {
+    if (search && !p.product_name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (dateFilter) {
+      const pDate = p.purchase_date || (p.created_at ? p.created_at.slice(0, 10) : "");
+      if (!pDate.startsWith(dateFilter)) return false;
+    }
+    if (buyerFilter && p.buyer_name !== buyerFilter) return false;
+    if (catFilter && p.category !== catFilter) return false;
+    return true;
+  });
+
+  const totalF = filtered.reduce((s, p) => s + Number(p.total), 0);
+  const hasFilters = search || dateFilter || catFilter || buyerFilter;
+
+  function handleDeleteClick(purchase) {
+    setDeleteTarget(purchase);
+  }
+
+  function handleConfirmDelete(reason) {
+    if (deleteTarget) {
+      onDelete(deleteTarget.id, reason, deleteTarget);
+      setDeleteTarget(null);
+    }
+  }
+
+  return (
+    <div>
+      {deleteTarget && (
+        <DeleteModal purchase={deleteTarget} onConfirm={handleConfirmDelete} onCancel={() => setDeleteTarget(null)} />
+      )}
+
+      <div className="flex justify-between items-baseline mb-3 flex-wrap gap-2">
+        <h2 className="text-[17px] font-medium">Historique ({filtered.length})</h2>
+        <span className="text-[17px] font-medium text-dlight">{formatDH(totalF)}</span>
+      </div>
+
+      <div className="flex flex-col gap-2 mb-4">
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un produit..." className="w-full h-11 px-3 rounded-xl border border-gray-300 text-[15px] focus:outline-none focus:ring-2 focus:ring-dlight/30" />
+        <div className="grid grid-cols-2 gap-2">
+          <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="w-full h-10 px-2 rounded-xl border border-gray-300 text-sm focus:outline-none" />
+          <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="h-10 rounded-xl border border-gray-300 px-2 text-sm bg-white">
+            <option value="">Toutes catégories</option>
+            {cats.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        {buyers.length > 1 && (
+          <select value={buyerFilter} onChange={e => setBuyerFilter(e.target.value)} className="h-10 rounded-xl border border-gray-300 px-2 text-sm bg-white">
+            <option value="">Tous les acheteurs</option>
+            {buyers.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        )}
+      </div>
+
+      {hasFilters && <button onClick={() => { setSearch(""); setDateFilter(""); setCatFilter(""); setBuyerFilter(""); }} className="mb-3 text-sm text-blue-600">Effacer les filtres</button>}
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-10 text-gray-400 text-[15px]">Aucun achat trouvé</div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {filtered.slice(0, 50).map(p => {
+            const displayDate = p.purchase_date || (p.created_at ? p.created_at.slice(0, 10) : "");
+            return (
+              <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-medium text-[15px]">{p.product_name}</span>
+                      <CatBadge cat={p.category} />
+                    </div>
+                    <div className="text-[13px] text-gray-500 leading-relaxed">{p.quantity} {p.unit} × {formatDH(p.unit_price)}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {p.buyer_name} — {formatDate(displayDate)}
+                    </div>
+                    {p.note && <div className="text-xs text-gray-400 mt-1 italic">{p.note}</div>}
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="font-medium text-[16px] text-dlight">{formatDH(p.total)}</span>
+                    <button onClick={() => handleDeleteClick(p)} className="text-xs text-red-400">supprimer</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length > 50 && <div className="text-center text-sm text-gray-400 py-3">50 affichés sur {filtered.length}</div>}
         </div>
       )}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
-        <h2 className="text-[17px] font-medium mb-4">Nouvel achat</h2>
-        <div className="mb-3.5">
-          <label className="text-sm text-gray-500 block mb-1.5">Produit</label>
-          <ProductAutocomplete value={pn} onChange={handleChange} onSelect={handleSelect} products={products} inputRef={prodRef} />
-        </div>
-        <div className="mb-3.5">
-          {cat ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">Catégorie :</span>
-              <CatBadge cat={cat} />
-              <button onClick={() => setCat("")} className="text-xs text-gray-400">changer</button>
-            </div>
-          ) : (
-            <div>
-              <label className="text-sm text-gray-500 block mb-1.5">Catégorie</label>
-              <select value={cat} onChange={e => setCat(e.target.value)} className="w-full h-11 rounded-xl border border-gray-300 px-3 text-[15px] bg-white focus:outline-none focus:ring-2 focus:ring-dlight/30">
-                <option value="">Choisir une catégorie</option>
-                {allCats.map(c => <option key={c} value={c}>{c}</option>)}
-                <option value="Non classé">Non classé</option>
-              </select>
-            </div>
-          )}
-        </div>
-        <div className="mb-3.5">
-          <label className="text-sm text-gray-500 block mb-1.5">
-            Date d&apos;achat <span className="text-gray-400">(aujourd&apos;hui par défaut)</span>
-          </label>
-          <input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} max={today}
-            className="w-full h-11 px-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-dlight/30" />
-        </div>
-        <div className="grid grid-cols-[1fr_auto] gap-2.5 mb-3.5">
-          <div>
-            <label className="text-sm text-gray-500 block mb-1.5">Quantité</label>
-            <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="0" min="0" step="0.01" inputMode="decimal" className="w-full h-11 px-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-dlight/30" />
-          </div>
-          <div>
-            <label className="text-sm text-gray-500 block mb-1.5">Unité</label>
-            <select value={unit} onChange={e => setUnit(e.target.value)} className="h-11 rounded-xl border border-gray-300 px-2.5 text-[15px] bg-white focus:outline-none">
-              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="mb-3.5">
-          <label className="text-sm text-gray-500 block mb-1.5">Prix unitaire (DH)</label>
-          <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" min="0" step="0.01" inputMode="decimal" className="w-full h-11 px-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-dlight/30" />
-        </div>
-        <div className="bg-gray-50 rounded-xl px-4 py-3 mb-3.5 flex justify-between items-center">
-          <span className="text-sm text-gray-500">Total</span>
-          <span className={`text-xl font-medium ${total > 0 ? "text-dlight" : "text-gray-900"}`}>{formatDH(total)}</span>
-        </div>
-        <div className="mb-4">
-          <label className="text-sm text-gray-500 block mb-1.5">Note (optionnel)</label>
-          <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="Ex: promotion, qualité..." className="w-full h-11 px-3 rounded-xl border border-gray-300 text-[15px] focus:outline-none focus:ring-2 focus:ring-dlight/30" />
-        </div>
-        <button onClick={handleSubmit} disabled={!ok || submitting}
-          className={`w-full py-3.5 rounded-xl font-medium text-base text-white transition active:scale-[0.98] ${ok && !submitting ? "bg-dlight" : "bg-green-300 cursor-default"}`}>
-          {submitting ? "Enregistrement..." : "Enregistrer l'achat"}
-        </button>
-      </div>
     </div>
   );
 }
