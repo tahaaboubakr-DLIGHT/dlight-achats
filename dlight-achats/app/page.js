@@ -70,6 +70,16 @@ export default function Home() {
     setPurchases(prev => [data, ...prev]); flash(true); startUndo(data);
   }
 
+  async function editPurchase(updated) {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { id, ...fields } = updated;
+    const { data, error } = await sb.from("purchases").update(fields).eq("id", id).select().single();
+    if (error) { flash(false); return; }
+    setPurchases(prev => prev.map(p => p.id === id ? data : p));
+    flash(true);
+  }
+
   async function deletePurchase(id, reason, purchase) {
     const sb = getSupabase();
     if (!sb) return;
@@ -169,7 +179,7 @@ export default function Home() {
           </div>
         )}
         {view === "form" && <PurchaseForm products={products} onAdd={addPurchase} onNewProduct={addProduct} lastPurchase={lastPurchase} undoTimer={undoTimer} onUndo={handleUndo} />}
-        {view === "history" && <PurchaseHistory purchases={purchases} currentUser={currentUser} onDelete={deletePurchase} />}
+        {view === "history" && <PurchaseHistory purchases={purchases} currentUser={currentUser} onDelete={deletePurchase} onEdit={editPurchase} products={products} />}
         {view === "admin" && currentUser.role === "admin" && <AdminPanel users={users} onAddUser={addUser} onRemoveUser={removeUser} products={products} onAddProduct={addProduct} onRemoveProduct={removeProduct} />}
         {view === "deletions" && currentUser.role === "admin" && <DeletionLogs />}
       </div>
