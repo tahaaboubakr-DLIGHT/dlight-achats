@@ -18,6 +18,7 @@ export default function Home() {
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [view, setView] = useState("form");
   const [saveStatus, setSaveStatus] = useState(null);
   const [lastPurchase, setLastPurchase] = useState(null);
@@ -36,14 +37,16 @@ export default function Home() {
     const sb = getSupabase();
     if (!sb) { setLoading(false); return; }
     try {
-      const [{ data: u }, { data: p }, { data: pu }] = await Promise.all([
+      const [{ data: u }, { data: p }, { data: pu }, { data: c }] = await Promise.all([
         sb.from("users").select("*").order("name"),
         sb.from("products").select("*").order("name"),
         sb.from("purchases").select("*").order("created_at", { ascending: false }).limit(200),
+        sb.from("categories").select("*").order("name"),
       ]);
       if (u) setUsers(u);
       if (p) setProducts(p);
       if (pu) setPurchases(pu);
+      if (c) setCategories(c);
     } catch (err) { console.error("Load error:", err); }
     setLoading(false);
   }
@@ -149,6 +152,23 @@ export default function Home() {
     setUsers(prev => prev.filter(u => u.id !== id)); flash(true);
   }
 
+  async function addCategory(cat) {
+    const sb = getSupabase();
+    if (!sb) return;
+    if (categories.find(c => c.name.toLowerCase() === cat.name.toLowerCase())) return;
+    const { data, error } = await sb.from("categories").insert([cat]).select().single();
+    if (error) { flash(false); return; }
+    setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name, "fr")));
+    flash(true);
+  }
+  async function removeCategory(id) {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb.from("categories").delete().eq("id", id);
+    if (error) { flash(false); return; }
+    setCategories(prev => prev.filter(c => c.id !== id)); flash(true);
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
@@ -180,7 +200,7 @@ export default function Home() {
         )}
         {view === "form" && <PurchaseForm products={products} onAdd={addPurchase} onNewProduct={addProduct} lastPurchase={lastPurchase} undoTimer={undoTimer} onUndo={handleUndo} />}
         {view === "history" && <PurchaseHistory purchases={purchases} currentUser={currentUser} onDelete={deletePurchase} onEdit={editPurchase} products={products} />}
-        {view === "admin" && currentUser.role === "admin" && <AdminPanel users={users} onAddUser={addUser} onRemoveUser={removeUser} products={products} onAddProduct={addProduct} onRemoveProduct={removeProduct} />}
+        {view === "admin" && currentUser.role === "admin" && <AdminPanel users={users} onAddUser={addUser} onRemoveUser={removeUser} products={products} onAddProduct={addProduct} onRemoveProduct={removeProduct} categories={categories} onAddCategory={addCategory} onRemoveCategory={removeCategory} />}
         {view === "deletions" && currentUser.role === "admin" && <DeletionLogs />}
       </div>
       <SaveIndicator status={saveStatus} />
