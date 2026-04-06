@@ -3,12 +3,12 @@ import { useState, useRef } from "react";
 import ProductAutocomplete from "./ProductAutocomplete";
 import CatBadge from "./CatBadge";
 import { formatDH } from "@/lib/utils";
-import { UNITS } from "@/lib/constants";
-export default function PurchaseForm({ products, categories, onAdd, onNewProduct, lastPurchase, undoTimer, onUndo }) {
+export default function PurchaseForm({ products, categories, units, onAdd, onNewProduct, lastPurchase, undoTimer, onUndo }) {
+  const unitNames = units.map(u => u.name);
   const [pn, setPn] = useState("");
   const [cat, setCat] = useState("");
   const [qty, setQty] = useState("");
-  const [unit, setUnit] = useState("kg");
+  const [unit, setUnit] = useState(unitNames[0] || "kg");
   const [price, setPrice] = useState("");
   const [note, setNote] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
@@ -77,7 +77,7 @@ export default function PurchaseForm({ products, categories, onAdd, onNewProduct
           <div>
             <label className="text-sm text-gray-500 block mb-1.5">Unite</label>
             <select value={unit} onChange={e => setUnit(e.target.value)} className="h-11 rounded-xl border border-gray-300 px-2.5 text-[15px] bg-white focus:outline-none">
-              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              {unitNames.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
         </div>
