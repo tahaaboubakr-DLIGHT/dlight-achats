@@ -3,9 +3,9 @@ import { useState, useRef } from "react";
 import ProductAutocomplete from "./ProductAutocomplete";
 import CatBadge from "./CatBadge";
 import { formatDH } from "@/lib/utils";
-import { UNITS } from "@/lib/constants";
 
-export default function EditPurchaseModal({ purchase, products, categories, onSave, onCancel }) {
+export default function EditPurchaseModal({ purchase, products, categories, units, onSave, onCancel }) {
+  const unitNames = units.map(u => u.name);
   const [pn, setPn] = useState(purchase.product_name);
   const [cat, setCat] = useState(purchase.category);
   const [qty, setQty] = useState(String(purchase.quantity));
@@ -15,7 +15,6 @@ export default function EditPurchaseModal({ purchase, products, categories, onSa
   const [purchaseDate, setPurchaseDate] = useState(purchase.purchase_date || "");
   const [saving, setSaving] = useState(false);
   const prodRef = useRef(null);
-
   const total = (parseFloat(qty) || 0) * (parseFloat(price) || 0);
   const catNames = categories.map(c => c.name).sort((a, b) => a.localeCompare(b, "fr"));
   const ok = pn.trim() && qty && parseFloat(qty) > 0 && price && parseFloat(price) > 0;
@@ -84,7 +83,8 @@ export default function EditPurchaseModal({ purchase, products, categories, onSa
           <div>
             <label className="text-sm text-gray-500 block mb-1.5">Unite</label>
             <select value={unit} onChange={e => setUnit(e.target.value)} className="h-11 rounded-xl border border-gray-300 px-2.5 text-[15px] bg-white focus:outline-none">
-              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              {unitNames.includes(unit) ? null : <option value={unit}>{unit}</option>}
+              {unitNames.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
         </div>
