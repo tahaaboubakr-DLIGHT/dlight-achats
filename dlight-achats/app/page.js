@@ -19,6 +19,7 @@ export default function Home() {
   const [products, setProducts] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [view, setView] = useState("form");
   const [saveStatus, setSaveStatus] = useState(null);
   const [lastPurchase, setLastPurchase] = useState(null);
@@ -34,13 +35,14 @@ export default function Home() {
     const sb = getSupabase();
     if (!sb) { setLoading(false); return; }
     try {
-      const [{ data: u }, { data: p }, { data: pu }, { data: c }] = await Promise.all([
+      const [{ data: u }, { data: p }, { data: pu }, { data: c }, { data: un }] = await Promise.all([
         sb.from("users").select("*").order("name"),
         sb.from("products").select("*").order("name"),
         sb.from("purchases").select("*").order("created_at", { ascending: false }).limit(200),
         sb.from("categories").select("*").order("name"),
+        sb.from("units").select("*").order("name"),
       ]);
-      if (u) setUsers(u); if (p) setProducts(p); if (pu) setPurchases(pu); if (c) setCategories(c);
+      if (u) setUsers(u); if (p) setProducts(p); if (pu) setPurchases(pu); if (c) setCategories(c); if (un) setUnits(un);
     } catch (err) { console.error("Load error:", err); }
     setLoading(false);
   }
@@ -118,6 +120,19 @@ export default function Home() {
     if (error) { flash(false); return; }
     setCategories(prev => prev.filter(c => c.id !== id)); flash(true);
   }
+  async function addUnit(unit) {
+    const sb = getSupabase(); if (!sb) return;
+    if (units.find(u => u.name.toLowerCase() === unit.name.toLowerCase())) return;
+    const { data, error } = await sb.from("units").insert([unit]).select().single();
+    if (error) { flash(false); return; }
+    setUnits(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name, "fr"))); flash(true);
+  }
+  async function removeUnit(id) {
+    const sb = getSupabase(); if (!sb) return;
+    const { error } = await sb.from("units").delete().eq("id", id);
+    if (error) { flash(false); return; }
+    setUnits(prev => prev.filter(u => u.id !== id)); flash(true);
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -145,9 +160,9 @@ export default function Home() {
             <button onClick={() => exportCSV(purchases)} className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-700 active:scale-95 transition">Exporter Excel</button>
           </div>
         )}
-        {view === "form" && <PurchaseForm products={products} categories={categories} onAdd={addPurchase} onNewProduct={addProduct} lastPurchase={lastPurchase} undoTimer={undoTimer} onUndo={handleUndo} />}
-        {view === "history" && <PurchaseHistory purchases={purchases} currentUser={currentUser} onDelete={deletePurchase} onEdit={editPurchase} products={products} categories={categories} />}
-        {view === "admin" && currentUser.role === "admin" && <AdminPanel users={users} onAddUser={addUser} onRemoveUser={removeUser} products={products} onAddProduct={addProduct} onRemoveProduct={removeProduct} categories={categories} onAddCategory={addCategory} onRemoveCategory={removeCategory} />}
+        {view === "form" && <PurchaseForm products={products} categories={categories} units={units} onAdd={addPurchase} onNewProduct={addProduct} lastPurchase={lastPurchase} undoTimer={undoTimer} onUndo={handleUndo} />}
+        {view === "history" && <PurchaseHistory purchases={purchases} currentUser={currentUser} onDelete={deletePurchase} onEdit={editPurchase} products={products} categories={categories} units={units} />}
+        {view === "admin" && currentUser.role === "admin" && <AdminPanel users={users} onAddUser={addUser} onRemoveUser={removeUser} products={products} onAddProduct={addProduct} onRemoveProduct={removeProduct} categories={categories} onAddCategory={addCategory} onRemoveCategory={removeCategory} units={units} onAddUnit={addUnit} onRemoveUnit={removeUnit} />}
         {view === "deletions" && currentUser.role === "admin" && <DeletionLogs />}
       </div>
       <SaveIndicator status={saveStatus} />
