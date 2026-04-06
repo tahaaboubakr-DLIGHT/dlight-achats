@@ -31,7 +31,7 @@ function DeleteModal({ purchase, onConfirm, onCancel }) {
   );
 }
 
-export default function PurchaseHistory({ purchases, currentUser, onDelete, onEdit, products, categories }) {
+export default function PurchaseHistory({ purchases, currentUser, onDelete, onEdit, products, categories, units }) {
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [buyerFilter, setBuyerFilter] = useState("");
@@ -57,7 +57,7 @@ export default function PurchaseHistory({ purchases, currentUser, onDelete, onEd
   return (
     <div>
       {deleteTarget && <DeleteModal purchase={deleteTarget} onConfirm={(reason) => { onDelete(deleteTarget.id, reason, deleteTarget); setDeleteTarget(null); }} onCancel={() => setDeleteTarget(null)} />}
-      {editTarget && <EditPurchaseModal purchase={editTarget} products={products} categories={categories || []} onSave={handleSaveEdit} onCancel={() => setEditTarget(null)} />}
+      {editTarget && <EditPurchaseModal purchase={editTarget} products={products} categories={categories || []} units={units || []} onSave={handleSaveEdit} onCancel={() => setEditTarget(null)} />}
 
       <div className="flex justify-between items-baseline mb-3 flex-wrap gap-2">
         <h2 className="text-[17px] font-medium">Historique ({filtered.length})</h2>
