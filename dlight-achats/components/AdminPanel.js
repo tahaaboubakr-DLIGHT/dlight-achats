@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { catColor } from "@/lib/constants";
 
-export default function AdminPanel({ users, onAddUser, onRemoveUser, products, onAddProduct, onRemoveProduct, categories, onAddCategory, onRemoveCategory }) {
+export default function AdminPanel({ users, onAddUser, onRemoveUser, products, onAddProduct, onRemoveProduct, categories, onAddCategory, onRemoveCategory, units, onAddUnit, onRemoveUnit }) {
   const [ne, setNe] = useState(""); const [nn, setNn] = useState(""); const [nr, setNr] = useState("buyer"); const [msg, setMsg] = useState("");
   const [npn, setNpn] = useState(""); const [npc, setNpc] = useState(""); const [pm, setPm] = useState("");
   const [newCat, setNewCat] = useState(""); const [catMsg, setCatMsg] = useState("");
+  const [newUnit, setNewUnit] = useState(""); const [unitMsg, setUnitMsg] = useState("");
 
   const catNames = categories.map(c => c.name).sort((a, b) => a.localeCompare(b, "fr"));
 
@@ -16,14 +17,12 @@ export default function AdminPanel({ users, onAddUser, onRemoveUser, products, o
     await onAddUser({ email: e, name: nn.trim(), role: nr });
     setNe(""); setNn(""); setMsg("Ajoute"); setTimeout(() => setMsg(""), 2000);
   }
-
   async function addP() {
     if (!npn.trim()) { setPm("Nom requis"); return; }
     if (products.find(p => p.name.toLowerCase() === npn.trim().toLowerCase())) { setPm("Existe deja"); return; }
     await onAddProduct({ name: npn.trim(), category: npc || "Non classe" });
     setNpn(""); setNpc(""); setPm("Ajoute"); setTimeout(() => setPm(""), 2000);
   }
-
   async function addCat() {
     const name = newCat.trim();
     if (!name) { setCatMsg("Nom requis"); return; }
@@ -31,15 +30,20 @@ export default function AdminPanel({ users, onAddUser, onRemoveUser, products, o
     await onAddCategory({ name });
     setNewCat(""); setCatMsg("Ajoutee"); setTimeout(() => setCatMsg(""), 2000);
   }
-
   async function removeCat(cat) {
     const prodsInCat = products.filter(p => p.category === cat.name);
-    if (prodsInCat.length > 0) {
-      setCatMsg("Impossible : " + prodsInCat.length + " produit(s) dans cette categorie");
-      setTimeout(() => setCatMsg(""), 3000);
-      return;
-    }
+    if (prodsInCat.length > 0) { setCatMsg("Impossible : " + prodsInCat.length + " produit(s) dans cette categorie"); setTimeout(() => setCatMsg(""), 3000); return; }
     await onRemoveCategory(cat.id);
+  }
+  async function addUn() {
+    const name = newUnit.trim();
+    if (!name) { setUnitMsg("Nom requis"); return; }
+    if (units.find(u => u.name.toLowerCase() === name.toLowerCase())) { setUnitMsg("Existe deja"); return; }
+    await onAddUnit({ name });
+    setNewUnit(""); setUnitMsg("Ajoutee"); setTimeout(() => setUnitMsg(""), 2000);
+  }
+  async function removeUn(unit) {
+    await onRemoveUnit(unit.id);
   }
 
   return (
@@ -83,20 +87,36 @@ export default function AdminPanel({ users, onAddUser, onRemoveUser, products, o
               <span key={cat.id} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px]"
                 style={{ background: cc.bg, color: cc.text, border: `1px solid ${cc.border}` }}>
                 {cat.name} <span className="opacity-60">({prodCount})</span>
-                {prodCount === 0 && (
-                  <button onClick={() => removeCat(cat)} className="text-[15px] leading-none opacity-60 ml-0.5" style={{ color: cc.text }}>x</button>
-                )}
+                {prodCount === 0 && <button onClick={() => removeCat(cat)} className="text-[15px] leading-none opacity-60 ml-0.5" style={{ color: cc.text }}>x</button>}
               </span>
             );
           })}
         </div>
-        <h3 className="text-[15px] font-medium mb-2">Ajouter une categorie</h3>
         <div className="flex gap-2">
-          <input type="text" value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="Nom de la nouvelle categorie"
+          <input type="text" value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="Nouvelle categorie"
             className="flex-1 h-11 px-3 rounded-xl border border-gray-300 text-[15px] focus:outline-none focus:ring-2 focus:ring-dlight/30" />
           <button onClick={addCat} className="h-11 px-5 bg-dlight text-white rounded-xl font-medium text-[15px] active:scale-95 transition">Ajouter</button>
         </div>
         {catMsg && <div className="text-sm text-green-700 mt-2">{catMsg}</div>}
+      </div>
+
+      {/* Units */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <h2 className="text-[17px] font-medium mb-3">Unites ({units.length})</h2>
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {units.sort((a, b) => a.name.localeCompare(b.name, "fr")).map(u => (
+            <span key={u.id} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[13px] bg-gray-100 text-gray-700 border border-gray-300">
+              {u.name}
+              <button onClick={() => removeUn(u)} className="text-[15px] leading-none opacity-60 ml-0.5">x</button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input type="text" value={newUnit} onChange={e => setNewUnit(e.target.value)} placeholder="Nouvelle unite (ex: botte, caisse...)"
+            className="flex-1 h-11 px-3 rounded-xl border border-gray-300 text-[15px] focus:outline-none focus:ring-2 focus:ring-dlight/30" />
+          <button onClick={addUn} className="h-11 px-5 bg-dlight text-white rounded-xl font-medium text-[15px] active:scale-95 transition">Ajouter</button>
+        </div>
+        {unitMsg && <div className="text-sm text-green-700 mt-2">{unitMsg}</div>}
       </div>
 
       {/* Products */}
